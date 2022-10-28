@@ -1,0 +1,5 @@
+/.idea
+/Backend/node_modules
+/Backend/package-lock.json
+/frontBank/node_modules
+/frontBank/.angular
