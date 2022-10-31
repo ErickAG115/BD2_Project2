@@ -53,9 +53,60 @@ router.get("/",   function (req, res) {
                         })
                         console.log(listCiudad)
 
+                        // Accedemos a cada año de cada ciudad
+                        listURLCiudad.forEach(url =>{
+                            request(urlWeb + url,  function (err, resp, body){
+                                if (err) console.log('Error: ' + err);
+                                let $ = cheerio.load(body);
+                                let listYear = [];
+                                let listURLYear = [];
+                                $('.mlistados a').each( function(){
+                                    console.log($(this).text())
+                                    let year = $(this).text().trim();
+                                    let urlYear = $(this).attr('href');
+                                    listYear.push(year);
+                                    listURLYear.push(urlYear)
+                                })
+                                console.log(listYear)
+
+                                // Accede a cada mes de cada año de cada ciudad
+                                listURLYear.forEach( url => {
+                                    request(urlWeb + url,  function (err, resp, body){
+                                        if (err) console.log('Error: ' + err);
+                                        let $ = cheerio.load(body);
+                                        let listMonth = [];
+                                        let listURLMonth = [];
+                                        $('.mlistados a').each( function(){
+                                            console.log($(this).text())
+                                            let year = $(this).text().trim();
+                                            let urlYear = $(this).attr('href');
+                                            listMonth.push(listMonth);
+                                            listURLMonth.push(listURLMonth)
+                                        })
+                                        console.log(listMonth)
+
+                                        //Accedemos los datos completos según el mes, año, ciudad, pais y continente.
+                                        listURLMonth.forEach( url => {
+                                            request(urlWeb + url,  function (err, resp, body){
+                                                if (err) console.log('Error: ' + err);
+                                                let $ = cheerio.load(body);
+
+                                                // FALTA EXTRAER DATOS DE LA TABLA MENSUAL DEL CLIMA
+
+
+                                            })
+                                        })
+
+                                    })
+                                })
+
+                            })
+                        })
 
                     })
                 })
+
+
 
             })
         })
