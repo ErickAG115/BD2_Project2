@@ -76,6 +76,8 @@ router.get("/",   function (req, res) {
                                         let $ = cheerio.load(body);
                                         let listMonth = [];
                                         let listURLMonth = [];
+                                        // FALTA CONSIDERAR LA TABLA POR AÑO.
+                                        // CUANDO SALE: "CLIMA 1980"
                                         $('.mlistados a').each( function(){
                                             console.log($(this).text())
                                             let year = $(this).text().trim();
