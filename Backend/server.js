@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.urlencoded({extended: false}));
 app.use(express.static(__dirname));
 
-
+// localhost:3000/mariaDB/example
 // Ruta hacia el crud y las distintas consultas de la base de datos de MariaDB
 app.use("/mariaDB", mariaDBRouter);
 // Ruta para el web crawler

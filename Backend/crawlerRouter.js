@@ -3,122 +3,106 @@ const router = express.Router();
 
 const request = require('request');
 const cheerio = require('cheerio');
+const fs = require('fs');
 
-const urlWeb = 'http://en.tutiempo.net';
+function getWeatherData(urlWeb, urlCiudad){
+    return new Promise((resolve, reject) => {
+        let datosAnuales = [];
+        console.log(urlWeb + urlCiudad);
+        request(urlWeb + urlCiudad,  function (err, resp, body){
+            if (err) console.log('Error: ' + err);
+            let $ = cheerio.load(body);
+            let tbody = $('.medias').find('tr').toArray();
+            // accedemos a cada pais
+            for(let tr of tbody){
+                let td =$(tr).find('td').toArray()
 
-router.get("/",   function (req, res) {
-    request(urlWeb + '/climate',  function (err, resp, body){
-        if (err) console.log('Error: ' + err);
-        let $ = cheerio.load(body);
-        // accedemos a cada continente
-        let listContinentes = [];
-        let listURLContinentes = [];
-        $('.mlistados a').each( function(){
-            let continente = $(this).text().trim();
-            let urlContinente = $(this).attr('href');
-            listContinentes.push(continente)
-            listURLContinentes.push(urlContinente)
+                let datos = [];
+                for (let text of td) {
+                    let dato = $(text).text().trim();
+                    datos.push(dato); //insertamos cada pais como clave y como valor un json de ciudades.
+                }
+                datosAnuales.push(datos);
+
+            }
+            datosAnuales = datosAnuales.filter(datos => datos[1] !== '-' && datos.length !== 0 )
+            console.log(datosAnuales);
+            resolve(datosAnuales);
         })
-        console.log(listContinentes);
+    });
 
-        // Accedemos a cada pais de cada continente
-        listURLContinentes.forEach(url => {
-            request(urlWeb + url,  function (err, resp, body){
-                if (err) console.log('Error: ' + err);
-                let $ = cheerio.load(body);
-                let listPaises = [];
-                let listURLPaises = [];
-                $('.mlistados a').each(  function(){
-                    let pais = $(this).text().trim();
-                    let urlPais = $(this).attr('href');
-                    listPaises.push(pais);
-                    listURLPaises.push(urlPais)
-                })
-                console.log(listPaises)
+}
+function getCities(urlWeb, urlPais){
+    return new Promise((resolve, reject) => {
+        let ciudades = {}
+        request(urlWeb + urlPais,  async function (err, resp, body){
+            if (err) console.log('Error: ' + err);
+            let $ = cheerio.load(body);
+            // accedemos a cada pais
+            for(let elem of $('.mlistados a').toArray()){
+                let ciudad = $(elem).text().trim();
+                let urlCiudad = $(elem).attr('href');
+                let listDatos = await getWeatherData(urlWeb, urlCiudad);
+                ciudades[ciudad] = listDatos; //insertamos cada ciudad como clave y como valor una lista de listas de datos.
+            }
+            console.log(ciudades);
 
-                // Accedemos a cada ciudad de cada pais
-                listURLPaises.forEach( url => {
-                    request(urlWeb + url,  function (err, resp, body){
-                        console.log(url)
-                        if (err) console.log('Error: ' + err);
-                        let $ = cheerio.load(body);
-                        let listCiudad = [];
-                        let listURLCiudad = [];
-                        $('.mlistados a').each( function(){
-                            console.log($(this).text())
-                            let ciudad = $(this).text().trim();
-                            let urlCiudad = $(this).attr('href');
-                            listCiudad.push(ciudad);
-                            listURLCiudad.push(urlCiudad)
-                        })
-                        console.log(listCiudad)
-
-                        // Accedemos a cada año de cada ciudad
-                        listURLCiudad.forEach(url =>{
-                            request(urlWeb + url,  function (err, resp, body){
-                                if (err) console.log('Error: ' + err);
-                                let $ = cheerio.load(body);
-                                let listYear = [];
-                                let listURLYear = [];
-                                $('.mlistados a').each( function(){
-                                    console.log($(this).text())
-                                    let year = $(this).text().trim();
-                                    let urlYear = $(this).attr('href');
-                                    listYear.push(year);
-                                    listURLYear.push(urlYear)
-                                })
-                                console.log(listYear)
-
-                                // Accede a cada mes de cada año de cada ciudad
-                                listURLYear.forEach( url => {
-                                    request(urlWeb + url,  function (err, resp, body){
-                                        if (err) console.log('Error: ' + err);
-                                        let $ = cheerio.load(body);
-                                        let listMonth = [];
-                                        let listURLMonth = [];
-                                        // FALTA CONSIDERAR LA TABLA POR AÑO.
-                                        // CUANDO SALE: "CLIMA 1980"
-                                        $('.mlistados a').each( function(){
-                                            console.log($(this).text())
-                                            let year = $(this).text().trim();
-                                            let urlYear = $(this).attr('href');
-                                            listMonth.push(listMonth);
-                                            listURLMonth.push(listURLMonth)
-                                        })
-                                        console.log(listMonth)
-
-                                        //Accedemos los datos completos según el mes, año, ciudad, pais y continente.
-                                        listURLMonth.forEach( url => {
-                                            request(urlWeb + url,  function (err, resp, body){
-                                                if (err) console.log('Error: ' + err);
-                                                let $ = cheerio.load(body);
-
-                                                // FALTA EXTRAER DATOS DE LA TABLA MENSUAL DEL CLIMA
-
-
-                                            })
-                                        })
-
-                                    })
-                                })
-
-                            })
-                        })
-
-                    })
-                })
-
-
-
-            })
+            resolve(ciudades);
         })
-    })
+    });
 
+}
+
+function getCountries(urlWeb, urlContinente){
+    return new Promise((resolve, reject) => {
+        let paises = {}
+        request(urlWeb + urlContinente,  async function (err, resp, body){
+            if (err) console.log('Error: ' + err);
+            let $ = cheerio.load(body);
+            // accedemos a cada pais
+            for(let elem of $('.mlistados a').toArray()){
+                let pais = $(elem).text().trim();
+                let urlPais = $(elem).attr('href');
+                let jsonCiudades = await getCities(urlWeb, urlPais);
+                paises[pais] = jsonCiudades; //insertamos cada pais como clave y como valor un json de ciudades.
+
+            }
+            resolve(paises);
+        })
+    });
+
+}
+
+router.get("/",   async function (req, res) {
+    /*
+    * datos = TM,TP, etc
+    * ciudad = {datos}
+    * pais = {ciudad...}
+    * continente = {pais...}
+    * dataWeb = {continente...}
+    *
+    * */
+    let dataWeb = {}
+    const urlWeb = 'http://en.tutiempo.net';
+
+    let list = await getWeatherData(urlWeb, '/climate/ws-136110.html')
+    console.log(list);
+    // let data = request(urlWeb + '/climate',  async function (err, resp, body){
+    //     if (err) console.log('Error: ' + err);
+    //     let $ = cheerio.load(body);
+    //     // accedemos a cada continente
+    //     for(let elem of $('.mlistados a').toArray()){
+    //         let continente = $(elem).text().trim();
+    //         let urlContinente = $(elem).attr('href');
+    //         let jsonPaises = await getCountries(urlWeb, urlContinente, continente);
+    //         dataWeb[continente] = jsonPaises; //insertamos cada continente como clave y como valor una json de paises
     //
-
-    console.log("fin")
-    res.send(200);
+    //     }
+    //
+    //     console.log(dataWeb);
+    // })
 });
+
 
 router.get("/example", async (req, res) => {
     res.send(200);
