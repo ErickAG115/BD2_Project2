@@ -5,10 +5,13 @@ const request = require('request');
 const cheerio = require('cheerio');
 const fs = require('fs');
 
+let contPages = 0;
+
 function getWeatherData(urlWeb, urlCiudad){
     return new Promise((resolve, reject) => {
         let datosAnuales = [];
-        console.log(urlWeb + urlCiudad);
+        contPages += 1;
+        console.log('Pagina #: ', contPages);
         request(urlWeb + urlCiudad,  function (err, resp, body){
             if (err) console.log('Error: ' + err);
             let $ = cheerio.load(body);
@@ -26,7 +29,7 @@ function getWeatherData(urlWeb, urlCiudad){
 
             }
             datosAnuales = datosAnuales.filter(datos => datos[1] !== '-' && datos.length !== 0 )
-            console.log(datosAnuales);
+            // console.log(datosAnuales);
             resolve(datosAnuales);
         })
     });
@@ -43,10 +46,9 @@ function getCities(urlWeb, urlPais){
                 let ciudad = $(elem).text().trim();
                 let urlCiudad = $(elem).attr('href');
                 let listDatos = await getWeatherData(urlWeb, urlCiudad);
+
                 ciudades[ciudad] = listDatos; //insertamos cada ciudad como clave y como valor una lista de listas de datos.
             }
-            console.log(ciudades);
-
             resolve(ciudades);
         })
     });
@@ -75,7 +77,7 @@ function getCountries(urlWeb, urlContinente){
 
 router.get("/",   async function (req, res) {
     /*
-    * datos = TM,TP, etc
+    * datos = [Year, TM,TP, etc]
     * ciudad = {datos}
     * pais = {ciudad...}
     * continente = {pais...}
@@ -84,23 +86,28 @@ router.get("/",   async function (req, res) {
     * */
     let dataWeb = {}
     const urlWeb = 'http://en.tutiempo.net';
+    contPages = 0; // inicializamos de nuevo
+    // let list = await getWeatherData(urlWeb, '/climate/ws-787613.html')
+    // console.log(list);
+    request(urlWeb + '/climate',  async function (err, resp, body){
+        if (err) console.log('Error: ' + err);
+        let $ = cheerio.load(body);
+        // accedemos a cada continente
+        for(let elem of $('.mlistados a').toArray()){
+            let continente = $(elem).text().trim();
+            let urlContinente = $(elem).attr('href');
+            let jsonPaises = await getCountries(urlWeb, urlContinente, continente);
+            dataWeb[continente] = jsonPaises; //insertamos cada continente como clave y como valor una json de paises
 
-    let list = await getWeatherData(urlWeb, '/climate/ws-136110.html')
-    console.log(list);
-    // let data = request(urlWeb + '/climate',  async function (err, resp, body){
-    //     if (err) console.log('Error: ' + err);
-    //     let $ = cheerio.load(body);
-    //     // accedemos a cada continente
-    //     for(let elem of $('.mlistados a').toArray()){
-    //         let continente = $(elem).text().trim();
-    //         let urlContinente = $(elem).attr('href');
-    //         let jsonPaises = await getCountries(urlWeb, urlContinente, continente);
-    //         dataWeb[continente] = jsonPaises; //insertamos cada continente como clave y como valor una json de paises
-    //
-    //     }
-    //
-    //     console.log(dataWeb);
-    // })
+        }
+        fs.writeFile('hadoopData.json', dataWeb, (err) => {
+            if (err) throw err;
+            console.log('Datos de '+ urlWeb+ ' guardados correctamente.');
+            res.send(200);
+        });
+
+    });
+
 });
 
 
