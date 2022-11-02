@@ -6,29 +6,41 @@ const cheerio = require('cheerio');
 const fs = require('fs');
 
 let contPages = 0;
+let contCities = 0;
 
 function getWeatherData(urlWeb, urlCiudad){
     return new Promise((resolve, reject) => {
-        let datosAnuales = [];
+        let datosAnuales = {};
         contPages += 1;
         console.log('Pagina #: ', contPages);
         request(urlWeb + urlCiudad,  function (err, resp, body){
             if (err) console.log('Error: ' + err);
             let $ = cheerio.load(body);
             let tbody = $('.medias').find('tr').toArray();
-            // accedemos a cada pais
+            // accedemos a cada dato en la columna
+            let indexFila = 0;
             for(let tr of tbody){
                 let td =$(tr).find('td').toArray()
+                if (indexFila !== 0) { //para evitar el encabezado de th
+                    let param = [];
+                    let indexColumna = 0;
+                    let year;
+                    for (let text of td) {
+                        let dato = $(text).text().trim();
+                        if (indexColumna === 0) {
+                            year = dato;
+                        } else {
+                            param.push(dato); //insertamos cada pais como clave y como valor un json de ciudades.
+                        }
+                        indexColumna += 1;
+                    }
+                    if (param[0] !== '-') { // Para evitar los años con datos vacíos.
+                        datosAnuales[year] = param;
+                    }
 
-                let datos = [];
-                for (let text of td) {
-                    let dato = $(text).text().trim();
-                    datos.push(dato); //insertamos cada pais como clave y como valor un json de ciudades.
                 }
-                datosAnuales.push(datos);
-
+                indexFila += 1;
             }
-            datosAnuales = datosAnuales.filter(datos => datos[1] !== '-' && datos.length !== 0 )
             // console.log(datosAnuales);
             resolve(datosAnuales);
         })
@@ -41,13 +53,21 @@ function getCities(urlWeb, urlPais){
         request(urlWeb + urlPais,  async function (err, resp, body){
             if (err) console.log('Error: ' + err);
             let $ = cheerio.load(body);
-            // accedemos a cada pais
+            contCities = 0;
+            // accedemos a cada ciudad
             for(let elem of $('.mlistados a').toArray()){
-                let ciudad = $(elem).text().trim();
-                let urlCiudad = $(elem).attr('href');
-                let listDatos = await getWeatherData(urlWeb, urlCiudad);
+                let ciudad = $(elem).text().trim(),
+                    urlCiudad = $(elem).attr('href');
 
-                ciudades[ciudad] = listDatos; //insertamos cada ciudad como clave y como valor una lista de listas de datos.
+                ciudades[ciudad] = await getWeatherData(urlWeb, urlCiudad); //insertamos cada ciudad como clave y como valor un JSON con clave año y valor la lista de datos.
+
+                if (Object.entries(ciudades[ciudad]).length !== 0){ //verifica si el datoAnual de la ciudad viene vacío.
+                    contCities += 1;
+                }
+                if (contCities >= 20) {
+                    contCities = 0;
+                    break;
+                }
             }
             resolve(ciudades);
         })
@@ -63,10 +83,9 @@ function getCountries(urlWeb, urlContinente){
             let $ = cheerio.load(body);
             // accedemos a cada pais
             for(let elem of $('.mlistados a').toArray()){
-                let pais = $(elem).text().trim();
-                let urlPais = $(elem).attr('href');
-                let jsonCiudades = await getCities(urlWeb, urlPais);
-                paises[pais] = jsonCiudades; //insertamos cada pais como clave y como valor un json de ciudades.
+                let pais = $(elem).text().trim(),
+                    urlPais = $(elem).attr('href');
+                paises[pais] = await getCities(urlWeb, urlPais); //insertamos cada pais como clave y como valor un json de ciudades.
 
             }
             resolve(paises);
@@ -77,12 +96,34 @@ function getCountries(urlWeb, urlContinente){
 
 router.get("/",   async function (req, res) {
     /*
-    * datos = [Year, TM,TP, etc]
+    * datos = { year: [TM,TP, etc]...}
     * ciudad = {datos}
     * pais = {ciudad...}
     * continente = {pais...}
     * dataWeb = {continente...}
     *
+    * Ejemplo:
+    *       dataWeb = { 'America':
+        *                       {'Canada':
+        *                                   {'Ciudad':
+        *                                               {
+        *                                               '1997': ['1','4','3.5'],
+        *                                               '1998': ['1','4','3.5'],
+        *                                               '1999': ['1','4','3.5']
+        *                                               }
+        *                                   }
+        *                       },
+        *               'Asia':
+        *                       {'China':
+        *                                   {'Ciudad':
+        *                                               {
+        *                                               '1997': ['1','4','3.5'],
+        *                                               '1998': ['1','4','3.5'],
+        *                                               '1999': ['1','4','3.5']
+        *                                               }
+        *                                   }
+        *                       }
+    *                   }
     * */
     let dataWeb = {}
     const urlWeb = 'http://en.tutiempo.net';
@@ -94,13 +135,13 @@ router.get("/",   async function (req, res) {
         let $ = cheerio.load(body);
         // accedemos a cada continente
         for(let elem of $('.mlistados a').toArray()){
-            let continente = $(elem).text().trim();
-            let urlContinente = $(elem).attr('href');
-            let jsonPaises = await getCountries(urlWeb, urlContinente, continente);
-            dataWeb[continente] = jsonPaises; //insertamos cada continente como clave y como valor una json de paises
+            let continente = $(elem).text().trim(),
+                urlContinente = $(elem).attr('href');
+            dataWeb[continente] = await getCountries(urlWeb, urlContinente, continente); //insertamos cada continente como clave y como valor una json de paises
 
         }
-        fs.writeFile('hadoopData.json', dataWeb, (err) => {
+        let data = JSON.stringify(dataWeb);
+        fs.writeFile('hadoopData.json', data, (err) => {
             if (err) throw err;
             console.log('Datos de '+ urlWeb+ ' guardados correctamente.');
             res.send(200);
