@@ -130,6 +130,10 @@ router.get("/",   async function (req, res) {
     contPages = 0; // inicializamos de nuevo
     // let list = await getWeatherData(urlWeb, '/climate/ws-787613.html')
     // console.log(list);
+
+    // Medir el tiempo
+    let startTime = Date.now();
+
     request(urlWeb + '/climate',  async function (err, resp, body){
         if (err) console.log('Error: ' + err);
         let $ = cheerio.load(body);
@@ -144,6 +148,8 @@ router.get("/",   async function (req, res) {
         fs.writeFile('hadoopData.json', data, (err) => {
             if (err) throw err;
             console.log('Datos de '+ urlWeb+ ' guardados correctamente.');
+            let ms = Date.now() - startTime;
+            console.log("Segundos: " + ms.toString());
             res.send(200);
         });
 
