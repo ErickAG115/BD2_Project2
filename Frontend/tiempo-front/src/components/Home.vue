@@ -1,9 +1,6 @@
 <template>
   <div class="home">
-    <h1>Hola</h1>
-    <hr>
     <h1>{{event}}</h1>   
-    <hr>
   </div>
 </template>
 
